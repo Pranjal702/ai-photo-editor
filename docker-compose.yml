@@ -1,0 +1,36 @@
+version: '3.9'
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
+  worker:
+    build: ./worker
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - HF_TOKEN=${HF_TOKEN}
+    depends_on:
+      - redis
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
