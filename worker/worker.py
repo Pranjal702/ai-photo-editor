@@ -1,4 +1,5 @@
-import os, time, json, base64, requests, redis, logging
+import os, time, json, base64, requests, redis, logging, threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 log = logging.getLogger(__name__)
@@ -9,7 +10,15 @@ HF_URL    = "https://api-inference.huggingface.co/models/stabilityai/stable-diff
 
 r = redis.from_url(REDIS_URL, decode_responses=False)
 
-def call_hf(image_b64: str, prompt: str) -> str:
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"worker ok")
+    def log_message(self, *args):
+        pass
+
+def call_hf(image_b64, prompt):
     headers  = {"Authorization": f"Bearer {HF_TOKEN}"}
     img_bytes = base64.b64decode(image_b64)
     resp = requests.post(HF_URL, headers=headers, data=img_bytes,
@@ -23,7 +32,7 @@ def call_hf(image_b64: str, prompt: str) -> str:
         return "data:image/png;base64," + base64.b64encode(resp.content).decode()
     raise Exception(f"HF API {resp.status_code}: {resp.text[:200]}")
 
-def process_job(job_id: str):
+def process_job(job_id):
     raw = r.get(f"job:{job_id}")
     if not raw:
         return
@@ -35,7 +44,7 @@ def process_job(job_id: str):
         result_url       = call_hf(job["image_b64"], job["prompt"])
         job["status"]     = "done"
         job["result_url"] = result_url
-        job["image_b64"]  = ""   # wipe image bytes immediately
+        job["image_b64"]  = ""
     except Exception as e:
         log.error(f"Job {job_id[:8]} failed: {e}")
         job["status"]        = "error"
@@ -43,7 +52,7 @@ def process_job(job_id: str):
         job["image_b64"]     = ""
     r.setex(f"job:{job_id}", 3600, json.dumps(job))
 
-def main():
+def run_worker():
     log.info("Worker ready — listening for jobs...")
     while True:
         try:
@@ -57,6 +66,15 @@ def main():
         except Exception as e:
             log.error(f"Unexpected: {e}")
             time.sleep(1)
+
+def main():
+    # Start health check server so Render doesn't kill us
+    port = int(os.getenv("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    log.info(f"Health server on port {port}")
+    run_worker()
 
 if __name__ == "__main__":
     main()
