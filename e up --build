@@ -1,0 +1,36 @@
+warning: in the working copy of 'frontend/nginx.conf', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/frontend/nginx.conf b/frontend/nginx.conf[m
+[1mindex e0d7841..3804723 100644[m
+[1m--- a/frontend/nginx.conf[m
+[1m+++ b/frontend/nginx.conf[m
+[36m@@ -1,5 +1,6 @@[m
+ server {[m
+     listen 80;[m
+[32m+[m
+     root /usr/share/nginx/html;[m
+     index index.html;[m
+ [m
+[36m@@ -8,10 +9,18 @@[m [mserver {[m
+     }[m
+ [m
+     location /api/ {[m
+[31m-        proxy_pass https://ai-photo-editor-hbng.onrender.com/;[m
+[31m-        proxy_set_header Host ai-photo-editor-hbng.onrender.com;[m
+[32m+[m[32m        proxy_pass http://backend:5000/;[m
+[32m+[m
+[32m+[m[32m        proxy_http_version 1.1;[m
+[32m+[m
+[32m+[m[32m        proxy_set_header Host $host;[m
+         proxy_set_header X-Real-IP $remote_addr;[m
+[31m-        proxy_read_timeout 120s;[m
+[31m-        client_max_body_size 20M;[m
+[32m+[m[32m        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;[m
+[32m+[m[32m        proxy_set_header X-Forwarded-Proto $scheme;[m
+[32m+[m
+[32m+[m[32m        proxy_connect_timeout 10s;[m
+[32m+[m[32m        proxy_read_timeout 180s;[m
+[32m+[m
+[32m+[m[32m        client_max_body_size 16M;[m
+     }[m
+ }[m
+\ No newline at end of file[m
