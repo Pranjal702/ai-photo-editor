@@ -9,8 +9,7 @@ CF_TOKEN       = os.getenv("CF_TOKEN", "")
 CF_ACCOUNT_ID  = os.getenv("CF_ACCOUNT_ID", "")
 
 # Cloudflare Workers AI - image-to-image model (free 100k requests/day)
-CF_AI_URL = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/runwayml/stable-diffusion-v1-5-img2img"
-
+CF_AI_URL = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/@cf/stabilityai/stable-diffusion-xl-base-1.0"
 r = redis.from_url(REDIS_URL, decode_responses=False)
 
 class HealthHandler(BaseHTTPRequestHandler):
@@ -28,16 +27,13 @@ def call_cloudflare(image_b64: str, prompt: str) -> str:
     }
     payload = {
         "prompt": prompt,
-        "image": [int(b) for b in base64.b64decode(image_b64)],
-        "strength": 0.75,
         "num_steps": 20,
     }
     resp = requests.post(CF_AI_URL, headers=headers, json=payload, timeout=120)
     if resp.status_code == 200:
-        data = resp.json()
-        if data.get("success") and data.get("result", {}).get("image"):
-            return "data:image/png;base64," + data["result"]["image"]
-        raise Exception(f"CF response unexpected: {str(data)[:200]}")
+        # Response is raw image bytes
+        result_b64 = base64.b64encode(resp.content).decode()
+        return "data:image/png;base64," + result_b64
     raise Exception(f"CF API {resp.status_code}: {resp.text[:200]}")
 
 def process_job(job_id: str):
